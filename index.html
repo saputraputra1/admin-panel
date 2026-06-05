@@ -452,11 +452,61 @@
     .bubble-wrap:hover .bubble-reply-btn { display: flex; }
     .bubble-reply-btn:hover { background: rgba(0,229,255,0.3); transform: translateY(-50%) scale(1.1); }
     /* QUICK REPLIES & SLEEP MODE */
-  .quick-replies { display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--bg-dark); }
-  .quick-replies::-webkit-scrollbar { height: 4px; }
-  .quick-replies::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-  .qr-btn { background: var(--bg-deep); border: 1px solid var(--border); color: var(--text-main); font-size: 12px; padding: 6px 12px; border-radius: 12px; cursor: pointer; white-space: nowrap; transition: 0.2s; }
-  .qr-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .quick-replies {
+    display: flex; flex-direction: column; gap: 0;
+    border-bottom: 1px solid var(--border); background: var(--surface);
+    max-height: 0; overflow: hidden; transition: max-height 0.3s ease;
+  }
+  .quick-replies.expanded { max-height: 280px; overflow-y: auto; }
+  .quick-replies::-webkit-scrollbar { width: 3px; }
+  .quick-replies::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .qr-toggle-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 16px; border-bottom: 1px solid var(--border);
+    background: var(--surface); cursor: pointer; flex-shrink: 0;
+    font-size: 12px; color: var(--muted); transition: 0.2s;
+    user-select: none;
+  }
+  .qr-toggle-bar:hover { color: var(--accent); }
+  .qr-toggle-bar .qr-toggle-icon { transition: transform 0.3s; }
+  .qr-toggle-bar.open .qr-toggle-icon { transform: rotate(180deg); }
+  .qr-category {
+    padding: 6px 16px 2px; font-size: 10px; font-weight: 700;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px;
+    border-top: 1px solid rgba(255,255,255,0.04); margin-top: 2px;
+  }
+  .qr-category:first-child { border-top: none; margin-top: 0; padding-top: 10px; }
+  .qr-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 16px 10px; }
+  .qr-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-size: 11px; padding: 5px 11px;
+    border-radius: 12px; cursor: pointer; white-space: nowrap; transition: 0.2s;
+    font-family: 'Syne', sans-serif;
+  }
+  .qr-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,229,255,0.06); }
+  .qr-btn.green:hover { border-color: var(--green); color: var(--green); background: rgba(0,230,118,0.06); }
+  .qr-btn.red:hover   { border-color: var(--red);   color: var(--red);   background: rgba(255,68,68,0.06); }
+  .qr-btn.yellow:hover { border-color: var(--yellow); color: var(--yellow); background: rgba(255,214,0,0.06); }
+
+  /* Push Notification Banner (Admin) */
+  .admin-notif-banner {
+    display: none; align-items: center; gap: 10px;
+    padding: 8px 16px; background: rgba(0,229,255,0.05);
+    border-bottom: 1px solid rgba(0,229,255,0.15);
+    font-size: 12px; color: var(--muted);
+  }
+  .admin-notif-banner.show { display: flex; }
+  .anb-btn {
+    padding: 4px 12px; border-radius: 6px; border: 1px solid rgba(0,229,255,0.3);
+    background: rgba(0,229,255,0.1); color: var(--accent); font-size: 11px;
+    cursor: pointer; font-family: 'Syne', sans-serif; font-weight: bold;
+    transition: 0.2s; flex-shrink: 0;
+  }
+  .anb-btn:hover { background: rgba(0,229,255,0.2); }
+  .anb-close {
+    background: none; border: none; color: var(--muted); font-size: 14px;
+    cursor: pointer; margin-left: auto; flex-shrink: 0;
+  }
 
   .sleep-mode-wrap { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-main); margin-right: 12px; }
   .sleep-switch { position: relative; display: inline-block; width: 34px; height: 18px; }
@@ -674,12 +724,59 @@
           <span class="rec-dot">●</span> Merekam... lepas untuk kirim
         </div>
 
-        <!-- Input -->
-        <div class="quick-replies">
-          <button class="qr-btn" onclick="sendQuickReply('Tunggu sebentar ya Kak, sedang dicek.')">Tunggu Sebentar</button>
-          <button class="qr-btn" onclick="sendQuickReply('Pesanan sedang diproses.')">Proses</button>
-          <button class="qr-btn" onclick="sendQuickReply('Kirimkan kode OTP yang masuk via SMS/WA.')">Minta OTP</button>
-          <button class="qr-btn" onclick="sendQuickReply('Pesanan sudah selesai. Terima kasih sudah berbelanja!')">Selesai</button>
+        <!-- Push Notif Banner Admin -->
+        <div class="admin-notif-banner" id="admin-notif-banner">
+          <span>🔔</span>
+          <span style="flex:1;">Aktifkan <b>notifikasi browser</b> agar tidak ketinggalan pesan baru saat tab minimized.</span>
+          <button class="anb-btn" onclick="adminRequestNotif()">Aktifkan</button>
+          <button class="anb-close" onclick="adminDismissNotif()" title="Tutup">✕</button>
+        </div>
+
+        <!-- Quick Replies Toggle Bar -->
+        <div class="qr-toggle-bar" id="qr-toggle-bar" onclick="toggleQuickReplies()">
+          <i class="fas fa-bolt" style="font-size:11px;color:var(--yellow);"></i>
+          <span>Balas Cepat</span>
+          <span style="flex:1;"></span>
+          <i class="fas fa-chevron-up qr-toggle-icon"></i>
+        </div>
+
+        <!-- Quick Replies Panel -->
+        <div class="quick-replies" id="quick-replies-panel">
+          <div class="qr-category">📦 Status Order</div>
+          <div class="qr-row">
+            <button class="qr-btn green" onclick="sendQuickReply('✅ Pembayaran kamu sudah kami terima. Pesanan sedang diproses, mohon ditunggu ya Kak!')">ACC & Proses</button>
+            <button class="qr-btn red" onclick="sendQuickReply('❌ Maaf, pesanan kamu tidak dapat kami proses. Silakan hubungi admin untuk info lebih lanjut.')">Tolak Order</button>
+            <button class="qr-btn green" onclick="sendQuickReply('🎉 Pesanan kamu sudah selesai diproses! Terima kasih sudah belanja di Saputra Nokos.')">Selesai ✓</button>
+          </div>
+
+          <div class="qr-category">⏳ Konfirmasi & Antrian</div>
+          <div class="qr-row">
+            <button class="qr-btn" onclick="sendQuickReply('Tunggu sebentar ya Kak, sedang kami cek dulu 🙏')">Tunggu Sebentar</button>
+            <button class="qr-btn" onclick="sendQuickReply('Pesanan kamu sudah masuk antrian ya Kak. Nomor antrian akan kami info segera.')">Masuk Antrian</button>
+            <button class="qr-btn yellow" onclick="sendQuickReply('Stok sedang terbatas untuk pilihan tersebut. Mau coba negara/kualitas lain?')">Stok Terbatas</button>
+          </div>
+
+          <div class="qr-category">📲 Verifikasi OTP</div>
+          <div class="qr-row">
+            <button class="qr-btn" onclick="sendQuickReply('Kirimkan kode OTP yang masuk via SMS/WA ke kami ya Kak. Jangan share ke siapapun selain kami 🔐')">Minta OTP</button>
+            <button class="qr-btn" onclick="sendQuickReply('OTP sudah kami terima. Sedang diproses, tunggu sebentar ya Kak 😊')">OTP Diterima</button>
+            <button class="qr-btn yellow" onclick="sendQuickReply('OTP belum masuk? Coba klik "Kirim Ulang" di aplikasinya ya Kak.')">OTP Belum Masuk</button>
+          </div>
+
+          <div class="qr-category">💰 Pembayaran</div>
+          <div class="qr-row">
+            <button class="qr-btn" onclick="sendQuickReply('Tolong kirimkan bukti transfer ya Kak (screenshot/foto struk transfer).')">Minta Bukti</button>
+            <button class="qr-btn" onclick="sendQuickReply('Nominal pembayaran kurang ya Kak. Mohon transfer kekurangannya atau hubungi kami untuk info lebih lanjut.')">Nominal Kurang</button>
+            <button class="qr-btn green" onclick="sendQuickReply('Pembayaran sudah kami terima dengan lengkap. Terima kasih! ✅')">Bayar OK</button>
+          </div>
+
+          <div class="qr-category">😊 Sapaan & Penutup</div>
+          <div class="qr-row">
+            <button class="qr-btn" onclick="sendQuickReply('Halo Kak! Ada yang bisa kami bantu? 😊')">Halo</button>
+            <button class="qr-btn" onclick="sendQuickReply('Maaf atas keterlambatannya ya Kak, kami segera cek pesananmu 🙏')">Minta Maaf</button>
+            <button class="qr-btn" onclick="sendQuickReply('Terima kasih sudah belanja di Saputra Nokos! Jangan lupa rekomendasikan ke teman-teman ya Kak 🙏')">Terima Kasih</button>
+            <button class="qr-btn" onclick="sendQuickReply('Silakan hubungi kami kembali jika ada pertanyaan atau pesanan selanjutnya 🙂')">Tutup Chat</button>
+          </div>
         </div>
         <div class="chat-pane-input">
           <button class="input-btn btn-attach" onclick="document.getElementById('admin-file-input').click()" title="Kirim Gambar">
@@ -1642,29 +1739,90 @@
     }
   }
 
-  // Patch showToast to also play sound
+  // Patch showToast to also play sound + browser push notif
   const _originalShowToast = showToast;
   showToast = function(name, msg, userId) {
     playNotifSound();
+    adminPushNotif(name, msg);
     _originalShowToast(name, msg, userId);
   };
 
-  // Patch maybeNotify to also play sound
+  // Patch maybeNotify to also play sound + browser push notif
   const _originalMaybeNotify = maybeNotify;
   maybeNotify = function(userId, userName, preview) {
     const prevUnread = lastKnownMsgCount[userId] || 0;
     const currentUnread = allInbox[userId]?.unread || 0;
     if (currentUnread > prevUnread && userId !== activeUserId) {
       playNotifSound();
+      adminPushNotif(userName, preview);
     }
     _originalMaybeNotify(userId, userName, preview);
   };
 
   // ── QUICK REPLIES ──────────────────────────────────────────────
   function sendQuickReply(text) {
-    if (!activeUserId) return;
+    if (!activeUserId) { showToast('Pilih dulu percakapan', 'Klik salah satu pembeli di sidebar.', null); return; }
     document.getElementById('admin-txt').value = text;
+    // Auto-collapse quick replies setelah klik
+    const panel = document.getElementById('quick-replies-panel');
+    const bar   = document.getElementById('qr-toggle-bar');
+    if (panel) { panel.classList.remove('expanded'); bar.classList.remove('open'); }
     adminSendMsg();
+  }
+
+  // Toggle panel quick replies
+  function toggleQuickReplies() {
+    const panel = document.getElementById('quick-replies-panel');
+    const bar   = document.getElementById('qr-toggle-bar');
+    if (!panel) return;
+    panel.classList.toggle('expanded');
+    bar.classList.toggle('open');
+  }
+
+  // ── PUSH NOTIFICATION (ADMIN BROWSER) ──────────────────────────
+  function adminCheckNotifPermission() {
+    if (!('Notification' in window)) return;
+    const dismissed = sessionStorage.getItem('admin_notif_dismissed');
+    if (dismissed) return;
+    if (Notification.permission === 'default') {
+      const banner = document.getElementById('admin-notif-banner');
+      if (banner) banner.classList.add('show');
+    }
+  }
+
+  function adminRequestNotif() {
+    if (!('Notification' in window)) { alert('Browser tidak mendukung notifikasi.'); return; }
+    Notification.requestPermission().then(perm => {
+      const banner = document.getElementById('admin-notif-banner');
+      if (banner) banner.classList.remove('show');
+      if (perm === 'granted') {
+        new Notification('✅ Notifikasi Admin Aktif!', {
+          body: 'Kamu akan mendapat notif pesan baru dari pembeli meski tab minimized.',
+          icon: 'https://cdn-icons-png.flaticon.com/512/4697/4697440.png'
+        });
+      }
+    });
+  }
+
+  function adminDismissNotif() {
+    const banner = document.getElementById('admin-notif-banner');
+    if (banner) banner.classList.remove('show');
+    sessionStorage.setItem('admin_notif_dismissed', '1');
+  }
+
+  // Kirim browser push notif ke admin saat ada pesan baru
+  function adminPushNotif(userName, preview) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+      const n = new Notification('💬 Pesan baru dari ' + userName, {
+        body: preview,
+        icon: 'https://cdn-icons-png.flaticon.com/512/4697/4697440.png',
+        badge: 'https://cdn-icons-png.flaticon.com/512/4697/4697440.png',
+        tag: 'admin-new-msg',
+        renotify: true
+      });
+      n.onclick = () => { window.focus(); n.close(); };
+    } catch(e) { console.warn('Admin notif error:', e); }
   }
 
   // ── SLEEP MODE (AUTO-REPLY) ────────────────────────────────────
@@ -1687,6 +1845,8 @@
     _originalBootAdmin(name);
     listenSleepMode();
     listenAllOrders();
+    // Cek permission push notif setelah login
+    setTimeout(adminCheckNotifPermission, 2000);
   };
 
   // ── ORDER MANAGEMENT ─────────────────────────────────────────────
