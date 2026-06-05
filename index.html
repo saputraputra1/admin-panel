@@ -2250,6 +2250,24 @@
           </div>
           <div id="theme-save-status" style="display:none; font-size:12px; color:#00e676; margin-bottom:10px; text-align:center;">✅ Tema berhasil diubah!</div>
 
+          <hr style="border:none; border-top:1px solid rgba(255,255,255,0.1); margin:25px 0;">
+
+          <h3 style="margin-bottom:15px; color:#fff; font-size:16px;">📡 Status Layanan (Status Page)</h3>
+          <p style="font-size:12px; color:#aaa; margin-bottom:15px;">Atur status tiap layanan. Pembeli bisa lihat di halaman <a href="status.html" target="_blank" style="color:var(--accent);">Status Page</a>.</p>
+
+          <div id="svc-status-controls" style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;"></div>
+          
+          <div id="svc-status-save" style="display:none; font-size:12px; color:#00e676; text-align:center; margin-bottom:10px;">✅ Status layanan diperbarui!</div>
+
+          <hr style="border:none; border-top:1px solid rgba(255,255,255,0.1); margin:25px 0;">
+
+          <h3 style="margin-bottom:15px; color:#fff; font-size:16px;">⚠️ Tambah Insiden / Pengumuman</h3>
+          <div style="background:var(--surface2); padding:16px; border-radius:12px; border:1px solid var(--border);">
+            <input type="text" id="incident-title" placeholder="Judul insiden (misal: Server WA Down)" style="width:100%; background:var(--bg); color:#fff; border:1px solid var(--border); padding:8px 12px; border-radius:8px; outline:none; font-family:'Syne',sans-serif; margin-bottom:8px; box-sizing:border-box;">
+            <textarea id="incident-desc" placeholder="Deskripsi detail..." rows="3" style="width:100%; background:var(--bg); color:#fff; border:1px solid var(--border); padding:8px 12px; border-radius:8px; outline:none; font-family:'Syne',sans-serif; resize:vertical; box-sizing:border-box;"></textarea>
+            <button onclick="addIncident()" style="margin-top:8px; background:#ff9800; color:#000; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer; font-family:'Syne',sans-serif;"><i class="fas fa-bullhorn"></i> Publikasikan Insiden</button>
+          </div>
+
         </div>
       </div>
 
@@ -2775,6 +2793,19 @@
             replyTo: { msgId: msgId, text: '📝 Pesanan Baru', senderName: 'Pembeli', type: 'order' }
           };
           await db.ref('chats/' + targetUserId + '/messages').push(data);
+          
+          if (status === 'completed') {
+            const reviewReq = {
+              type: 'review_request',
+              orderId: msgId,
+              text: '⭐ Berikan ulasan untuk pesanan ini',
+              senderId: 'admin_saputra', senderName: 'Sistem',
+              senderRole: 'admin',
+              timestamp: Date.now() + 1000
+            };
+            await db.ref('chats/' + targetUserId + '/messages').push(reviewReq);
+          }
+          
           await db.ref('admin_inbox/' + targetUserId).update({ lastMessage: textStatus, lastMessageType: 'text', lastMessageTime: Date.now() });
         }
       } catch (e) {
@@ -3362,12 +3393,14 @@
       db.ref('admin_settings/sleepMode').set(isChecked);
     }
 
-    // Start sleep mode & order listener when boot
+    // Start listeners when boot
     const _originalBootAdmin = bootAdmin;
     bootAdmin = function (name) {
       _originalBootAdmin(name);
       listenSleepMode();
       listenAllOrders();
+      listenTheme();
+      listenServiceStatus();
       // Cek permission push notif setelah login
       setTimeout(adminCheckNotifPermission, 2000);
     };
@@ -3433,6 +3466,94 @@
         setTimeout(() => { status.style.display = 'none'; }, 3000);
       }).catch(err => {
         alert('Gagal menyimpan: ' + err.message);
+      });
+    }
+
+    // ── THEME MANAGEMENT ───────────────────────────────────────────
+    function saveTheme(accent, accent2) {
+      if (!db) return;
+      db.ref('admin_settings/theme').set({ accent, accent2 }).then(() => {
+        const status = document.getElementById('theme-save-status');
+        if(status) {
+          status.style.display = 'block';
+          setTimeout(() => { status.style.display = 'none'; }, 3000);
+        }
+      });
+    }
+
+    function listenTheme() {
+      if (!db) return;
+      db.ref('admin_settings/theme').on('value', snap => {
+        const theme = snap.val();
+        if (theme && theme.accent) {
+          document.documentElement.style.setProperty('--accent', theme.accent);
+          document.documentElement.style.setProperty('--accent2', theme.accent2 || theme.accent);
+        }
+      });
+    }
+
+    // ── STATUS PAGE MANAGEMENT ──────────────────────────────────────
+    const SERVICE_LIST = ['whatsapp', 'telegram', 'wechat', 'vkontakte'];
+    function renderStatusControls(data) {
+      const container = document.getElementById('svc-status-controls');
+      if (!container) return;
+      let html = '';
+      SERVICE_LIST.forEach(svc => {
+        const d = (data && data[svc]) ? data[svc] : { status: 'operational', note: '' };
+        html += `
+          <div style="display:flex; align-items:center; gap:10px; background:var(--surface2); padding:10px; border-radius:8px; border:1px solid var(--border);">
+            <div style="width:80px; font-weight:bold; color:var(--accent); text-transform:capitalize;">${svc}</div>
+            <select id="svc-status-${svc}" style="background:var(--bg); color:#fff; border:1px solid var(--border); padding:6px; border-radius:6px; outline:none; font-family:'Syne',sans-serif;">
+              <option value="operational" ${d.status === 'operational' ? 'selected' : ''}>✅ Normal</option>
+              <option value="degraded" ${d.status === 'degraded' ? 'selected' : ''}>⚠️ Gangguan</option>
+              <option value="outage" ${d.status === 'outage' ? 'selected' : ''}>🔴 Down</option>
+              <option value="maintenance" ${d.status === 'maintenance' ? 'selected' : ''}>🔧 Maintenance</option>
+            </select>
+            <input type="text" id="svc-note-${svc}" value="${d.note || ''}" placeholder="Catatan opsional..." style="flex:1; background:var(--bg); color:#fff; border:1px solid var(--border); padding:6px; border-radius:6px; outline:none; font-family:'Syne',sans-serif;">
+          </div>
+        `;
+      });
+      html += `<button onclick="saveServiceStatus()" style="background:#00e676; color:#000; border:none; padding:10px; border-radius:8px; font-weight:bold; cursor:pointer; font-family:'Syne',sans-serif; align-self:flex-end;"><i class="fas fa-save"></i> Update Status</button>`;
+      container.innerHTML = html;
+    }
+
+    function listenServiceStatus() {
+      if (!db) return;
+      db.ref('service_status').on('value', snap => {
+        renderStatusControls(snap.val() || {});
+      });
+    }
+
+    function saveServiceStatus() {
+      if (!db) return;
+      const data = {};
+      SERVICE_LIST.forEach(svc => {
+        const statusEl = document.getElementById('svc-status-' + svc);
+        const noteEl = document.getElementById('svc-note-' + svc);
+        if (statusEl) {
+          data[svc] = { status: statusEl.value, note: noteEl.value.trim() };
+        }
+      });
+      db.ref('service_status').set(data).then(() => {
+        const s = document.getElementById('svc-status-save');
+        if(s) {
+          s.style.display = 'block';
+          setTimeout(() => { s.style.display = 'none'; }, 3000);
+        }
+      });
+    }
+
+    function addIncident() {
+      if (!db) return;
+      const t = document.getElementById('incident-title').value.trim();
+      const d = document.getElementById('incident-desc').value.trim();
+      if (!t) return alert('Judul insiden wajib diisi');
+      
+      const newInc = { title: t, description: d, timestamp: Date.now() };
+      db.ref('service_incidents').push(newInc).then(() => {
+        alert('Insiden berhasil dipublikasikan!');
+        document.getElementById('incident-title').value = '';
+        document.getElementById('incident-desc').value = '';
       });
     }
 
